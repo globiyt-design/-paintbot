@@ -38,7 +38,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет! Нажмите кнопку, чтобы начать заявку.", reply_markup=reply_markup)
 
 # ----------------------------
-# Кнопки
+# Кнопки старта
 # ----------------------------
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -48,38 +48,61 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("Отлично! Как вас зовут?")
 
 # ----------------------------
-# Главная логика чата
+# Пошаговый чат
 # ----------------------------
 TASK_OPTIONS = ["Покраска стен", "Ремонт", "Доставка", "Другое"]
 
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     step = context.user_data.get("step")
     if not step:
-        return  # Ждём пока пользователь нажмёт кнопку
+        return  # Ждём нажатия кнопки "Начать заявку"
 
+    # ------------------ Шаг 1: имя ------------------
     if step == "ask_name":
         context.user_data["name"] = update.message.text
         context.user_data["step"] = "ask_phone"
         await update.message.reply_text("Напишите ваш номер телефона")
-    elif step == "ask_phone":
+        return
+
+    # ------------------ Шаг 2: телефон ------------------
+    if step == "ask_phone":
         context.user_data["phone"] = update.message.text
         context.user_data["step"] = "ask_task"
 
-        # Кнопки с типовыми задачами
+        # Кнопки популярных задач
         keyboard = [[InlineKeyboardButton(t, callback_data=f"task_{t}")] for t in TASK_OPTIONS]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("Выберите тип задачи или напишите свой:", reply_markup=reply_markup)
+        await update.message.reply_text("Выберите тип задачи или напишите свой вариант:", reply_markup=reply_markup)
+        return
+
+    # ------------------ Шаг 3: задача (текст пользователем) ------------------
+    if step == "ask_task_text":
+        context.user_data["task"] = update.message.text
+        await process_task(update, context)
+        return
 
 # ----------------------------
-# Обработка выбора задачи через кнопки
+# Обработка кнопок выбора задачи
 # ----------------------------
 async def task_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     task_text = query.data.replace("task_", "")
-    context.user_data["task"] = task_text
+    
+    if task_text == "Другое":
+        # Пользователь будет писать свой вариант
+        context.user_data["step"] = "ask_task_text"
+        await query.message.reply_text("Напишите, пожалуйста, вашу задачу:")
+        return
 
-    # Отправляем ИИ для ответа
+    # Выбран один из популярных вариантов
+    context.user_data["task"] = task_text
+    await process_task(query, context)
+
+# ----------------------------
+# Отправка задачи ИИ и сохранение заявки
+# ----------------------------
+async def process_task(update_or_query, context: ContextTypes.DEFAULT_TYPE):
     messages = [
         {"role": "system", "content": """
 Ты помощник компании. Отвечай клиенту вежливо и по делу.
@@ -94,15 +117,18 @@ async def task_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     answer = response.choices[0].message.content
-
-    # Сохраняем заявку
     save_lead(context.user_data["name"], context.user_data["phone"], context.user_data["task"])
 
     # Кнопка "Сделать новую заявку"
     keyboard = [[InlineKeyboardButton("Сделать новую заявку", callback_data="start_form")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await query.message.reply_text(f"{answer}\n\n✅ Ваша заявка сохранена!", reply_markup=reply_markup)
+    # Определяем объект для отправки (Message или CallbackQuery)
+    if hasattr(update_or_query, "message"):
+        await update_or_query.message.reply_text(f"{answer}\n\n✅ Ваша заявка сохранена!", reply_markup=reply_markup)
+    else:
+        await update_or_query.edit_message_text(f"{answer}\n\n✅ Ваша заявка сохранена!", reply_markup=reply_markup)
+
     context.user_data.clear()
 
 # ----------------------------
