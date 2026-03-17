@@ -1,7 +1,8 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes, CommandHandler, CallbackQueryHandler
 from groq import Groq
 import sqlite3
+import openpyxl
 import os
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -29,16 +30,34 @@ def save_lead(name, phone, task):
     conn.commit()
 
 # ----------------------------
-# Старт бота
+# Экспорт заявок в Excel
+# ----------------------------
+def export_leads_to_excel():
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["ID", "Имя", "Телефон", "Задача"])
+    cursor.execute("SELECT * FROM leads")
+    rows = cursor.fetchall()
+    for row in rows:
+        ws.append(row)
+    file_name = "all_leads.xlsx"
+    wb.save(file_name)
+    return file_name
+
+# ----------------------------
+# Настройка стартовой кнопки
 # ----------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
-    keyboard = [[InlineKeyboardButton("Начать заявку", callback_data="start_form")]]
+    keyboard = [
+        [InlineKeyboardButton("Начать заявку", callback_data="start_form")],
+        [InlineKeyboardButton("Получить все заявки (админ)", callback_data="get_leads")]
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Привет! Нажмите кнопку, чтобы начать заявку.", reply_markup=reply_markup)
+    await update.message.reply_text("Привет! Выберите действие:", reply_markup=reply_markup)
 
 # ----------------------------
-# Кнопки старта
+# Обработка кнопок
 # ----------------------------
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -46,9 +65,12 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "start_form":
         context.user_data["step"] = "ask_name"
         await query.message.reply_text("Отлично! Как вас зовут?")
+    elif query.data == "get_leads":
+        file_name = export_leads_to_excel()
+        await query.message.reply_document(document=InputFile(file_name), caption="Все текущие заявки")
 
 # ----------------------------
-# Пошаговый чат
+# Пошаговый сбор заявки
 # ----------------------------
 TASK_OPTIONS = ["Покраска стен", "Ремонт", "Доставка", "Другое"]
 
@@ -57,14 +79,12 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not step:
         return  # Ждём нажатия кнопки "Начать заявку"
 
-    # ------------------ Шаг 1: имя ------------------
     if step == "ask_name":
         context.user_data["name"] = update.message.text
         context.user_data["step"] = "ask_phone"
         await update.message.reply_text("Напишите ваш номер телефона")
         return
 
-    # ------------------ Шаг 2: телефон ------------------
     if step == "ask_phone":
         context.user_data["phone"] = update.message.text
         context.user_data["step"] = "ask_task"
@@ -75,7 +95,6 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Выберите тип задачи или напишите свой вариант:", reply_markup=reply_markup)
         return
 
-    # ------------------ Шаг 3: задача (текст пользователем) ------------------
     if step == "ask_task_text":
         context.user_data["task"] = update.message.text
         await process_task(update, context)
@@ -90,12 +109,10 @@ async def task_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     task_text = query.data.replace("task_", "")
     
     if task_text == "Другое":
-        # Пользователь будет писать свой вариант
         context.user_data["step"] = "ask_task_text"
         await query.message.reply_text("Напишите, пожалуйста, вашу задачу:")
         return
 
-    # Выбран один из популярных вариантов
     context.user_data["task"] = task_text
     await process_task(query, context)
 
@@ -123,7 +140,6 @@ async def process_task(update_or_query, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Сделать новую заявку", callback_data="start_form")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Определяем объект для отправки (Message или CallbackQuery)
     if hasattr(update_or_query, "message"):
         await update_or_query.message.reply_text(f"{answer}\n\n✅ Ваша заявка сохранена!", reply_markup=reply_markup)
     else:
@@ -136,7 +152,7 @@ async def process_task(update_or_query, context: ContextTypes.DEFAULT_TYPE):
 # ----------------------------
 app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 app.add_handler(CommandHandler("start", start))
-app.add_handler(CallbackQueryHandler(button, pattern="^start_form$"))
+app.add_handler(CallbackQueryHandler(button, pattern="^start_form$|^get_leads$"))
 app.add_handler(CallbackQueryHandler(task_button, pattern="^task_"))
 app.add_handler(MessageHandler(filters.TEXT, chat))
 app.run_polling()
