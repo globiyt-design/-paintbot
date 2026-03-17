@@ -1,7 +1,7 @@
-from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes, CommandHandler
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes, CommandHandler, CallbackQueryHandler
 from groq import Groq
-import openpyxl
+import sqlite3
 import os
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -9,89 +9,108 @@ GROQ_KEY = os.environ.get("GROQ_KEY")
 
 client = Groq(api_key=GROQ_KEY)
 
-def save_lead(name, phone, task):
-    try:
-        file = "zayavki.xlsx"
-        if os.path.exists(file):
-            wb = openpyxl.load_workbook(file)
-            ws = wb.active
-        else:
-            wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.append(["Имя", "Телефон", "Задача"])
-        ws.append([name, phone, task])
-        wb.save(file)
-    except Exception as e:
-        print("Ошибка сохранения:", e)
+# ----------------------------
+# Настройка базы данных
+# ----------------------------
+conn = sqlite3.connect("leads.db")
+cursor = conn.cursor()
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    phone TEXT,
+    task TEXT
+)
+""")
+conn.commit()
 
+def save_lead(name, phone, task):
+    cursor.execute("INSERT INTO leads (name, phone, task) VALUES (?, ?, ?)", (name, phone, task))
+    conn.commit()
+
+# ----------------------------
+# Старт бота
+# ----------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
-    await update.message.reply_text("Привет! Я помошник Айко-аудит Напиши свой вопрос.")
+    keyboard = [[InlineKeyboardButton("Начать заявку", callback_data="start_form")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Привет! Нажмите кнопку, чтобы начать заявку.", reply_markup=reply_markup)
+
+# ----------------------------
+# Кнопки
+# ----------------------------
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "start_form":
+        context.user_data["step"] = "ask_name"
+        await query.message.reply_text("Отлично! Как вас зовут?")
+
+# ----------------------------
+# Главная логика чата
+# ----------------------------
+TASK_OPTIONS = ["Покраска стен", "Ремонт", "Доставка", "Другое"]
 
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        user_message = update.message.text
+    step = context.user_data.get("step")
+    if not step:
+        return  # Ждём пока пользователь нажмёт кнопку
 
-        # фикс истории
-        if "history" not in context.user_data:
-            context.user_data["history"] = []
+    if step == "ask_name":
+        context.user_data["name"] = update.message.text
+        context.user_data["step"] = "ask_phone"
+        await update.message.reply_text("Напишите ваш номер телефона")
+    elif step == "ask_phone":
+        context.user_data["phone"] = update.message.text
+        context.user_data["step"] = "ask_task"
 
-        context.user_data["history"].append({
-            "role": "user",
-            "content": user_message
-        })
+        # Кнопки с типовыми задачами
+        keyboard = [[InlineKeyboardButton(t, callback_data=f"task_{t}")] for t in TASK_OPTIONS]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text("Выберите тип задачи или напишите свой:", reply_markup=reply_markup)
 
-        messages = [
-            {
-                "role": "system",
-                "content": """Ты помошник бухгалтерской организации-калькулятора.
-Отвечай на вопросы клиентов.
-Когда клиент готов оставить заявку — собери имя, телефон и задачу.
-Когда получишь все данные, напиши:
+# ----------------------------
+# Обработка выбора задачи через кнопки
+# ----------------------------
+async def task_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    task_text = query.data.replace("task_", "")
+    context.user_data["task"] = task_text
 
-ЗАЯВКА: Имя=[имя] Телефон=[телефон] Задача=[задача]"""
-            }
-        ] + context.user_data["history"]
+    # Отправляем ИИ для ответа
+    messages = [
+        {"role": "system", "content": """
+Ты помощник компании. Отвечай клиенту вежливо и по делу.
+Когда клиент готов оставить заявку — собери Имя, Телефон и Задачу.
+"""}, 
+        {"role": "user", "content": context.user_data["task"]}
+    ]
 
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=messages
-        )
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=messages
+    )
 
-        answer = response.choices[0].message.content
+    answer = response.choices[0].message.content
 
-        context.user_data["history"].append({
-            "role": "assistant",
-            "content": answer
-        })
+    # Сохраняем заявку
+    save_lead(context.user_data["name"], context.user_data["phone"], context.user_data["task"])
 
-        # обработка заявки
-        if "ЗАЯВКА:" in answer:
-            try:
-                parts = answer.split("ЗАЯВКА:")[1].strip()
-                name = parts.split("Имя=")[1].split()[0]
-                phone = parts.split("Телефон=")[1].split()[0]
-                task = parts.split("Задача=")[1].strip()
+    # Кнопка "Сделать новую заявку"
+    keyboard = [[InlineKeyboardButton("Сделать новую заявку", callback_data="start_form")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-                save_lead(name, phone, task)
+    await query.message.reply_text(f"{answer}\n\n✅ Ваша заявка сохранена!", reply_markup=reply_markup)
+    context.user_data.clear()
 
-                clean = answer.split("ЗАЯВКА:")[0].strip()
-                clean += "\n\n✅ Заявка сохранена!"
-                await update.message.reply_text(clean)
-                return
-            except Exception as e:
-                print("Ошибка парсинга:", e)
-
-        await update.message.reply_text(answer)
-
-    except Exception as e:
-        print("Ошибка бота:", e)
-        await update.message.reply_text("Ошибка 😢 попробуй позже")
-
+# ----------------------------
+# Запуск бота
+# ----------------------------
 app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
 app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
-
-print("Бот запущен...")
+app.add_handler(CallbackQueryHandler(button, pattern="^start_form$"))
+app.add_handler(CallbackQueryHandler(task_button, pattern="^task_"))
+app.add_handler(MessageHandler(filters.TEXT, chat))
 app.run_polling()
