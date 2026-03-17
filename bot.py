@@ -26,7 +26,7 @@ def save_lead(name, phone, task):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
-    await update.message.reply_text("Привет! Я помощник по покраске стен 🎨 Напиши свой вопрос.")
+    await update.message.reply_text("Привет! Я помошник Айко-аудит Напиши свой вопрос.")
 
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -44,7 +44,7 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         messages = [
             {
                 "role": "system",
-                "content": """Ты помощник компании по покраске стен.
+                "content": """Ты помошник бухгалтерской организации-калькулятора.
 Отвечай на вопросы клиентов.
 Когда клиент готов оставить заявку — собери имя, телефон и задачу.
 Когда получишь все данные, напиши:
