@@ -4,7 +4,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 import os
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-ADMIN_ID = os.environ.get("ADMIN_ID") 
+ADMIN_ID = int(os.environ.get("ADMIN_ID"))  
 
 
 def init_db():
@@ -124,8 +124,7 @@ async def leads(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ----------------------
 def main():
     init_db()
-
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()  # <-- здесь TELEGRAM_TOKEN
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("leads", leads))
@@ -133,5 +132,6 @@ def main():
 
     print("Бот запущен...")
     app.run_polling()
+
 if __name__ == "__main__":
     main()
