@@ -124,7 +124,8 @@ async def leads(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ----------------------
 def main():
     init_db()
-    app = ApplicationBuilder().token(TOKEN).build()
+
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("leads", leads))
@@ -132,6 +133,3 @@ def main():
 
     print("Бот запущен...")
     app.run_polling()
-
-if __name__ == "__main__":
-    main()
