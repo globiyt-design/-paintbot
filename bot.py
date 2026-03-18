@@ -42,9 +42,13 @@ async def notify_admin(context: ContextTypes.DEFAULT_TYPE, name, phone, task):
 # --- Команды ---
 # ----------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [["📋 Оставить заявку"]]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    # если админ — показываем две кнопки
+    if update.effective_user.id == ADMIN_ID:
+        keyboard = [["📋 Оставить заявку", "👀 Посмотреть заявки"]]
+    else:
+        keyboard = [["📋 Оставить заявку"]]
 
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(
         "Привет! Нажми кнопку, чтобы оставить заявку.",
         reply_markup=reply_markup
@@ -61,6 +65,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "📋 Оставить заявку":
         context.user_data["step"] = "name"
         await update.message.reply_text("Введите имя:")
+        return
+
+    # Просмотр заявок (только для админа)
+    if text == "👀 Посмотреть заявки" and update.effective_user.id == ADMIN_ID:
+        await leads(update, context)
         return
 
     # Шаг 1 — имя
@@ -124,7 +133,7 @@ async def leads(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ----------------------
 def main():
     init_db()
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()  # <-- здесь TELEGRAM_TOKEN
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("leads", leads))
