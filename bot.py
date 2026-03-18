@@ -1,9 +1,10 @@
 import sqlite3
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+import os
 
-TOKEN = "TELEGRAM_TOKEN"  
-ADMIN_ID = 'ID'  
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+ADMIN_ID = os.environ.get("ADMIN_ID") 
 
 
 def init_db():
