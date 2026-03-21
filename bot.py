@@ -136,7 +136,7 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("leads", leads))
-    app.add_handler(CommandHandler("db", get_db))  # 🔥 ВОТ ЭТА СТРОКА НОВАЯ
+    app.add_handler(CommandHandler("db", get_db))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("Бот запущен...")
