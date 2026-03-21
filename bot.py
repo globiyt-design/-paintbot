@@ -24,13 +24,18 @@ def init_db():
 def save_lead(name, phone, task):
     conn = sqlite3.connect("leads.db")
     cursor = conn.cursor()
+
+    print("📥 Пытаемся сохранить:", name, phone, task)
+
     cursor.execute(
         "INSERT INTO leads (name, phone, task) VALUES (?, ?, ?)",
         (name, phone, task)
     )
+
     conn.commit()
     conn.close()
-    print("✅ Заявка сохранена в базе:", name, phone, task)
+
+    print("✅ Сохранено в базе")
 
 async def notify_admin(context: ContextTypes.DEFAULT_TYPE, name, phone, task):
     await context.bot.send_message(
