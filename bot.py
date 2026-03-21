@@ -42,7 +42,6 @@ async def notify_admin(context: ContextTypes.DEFAULT_TYPE, name, phone, task):
 # --- Команды ---
 # ----------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # если админ — показываем две кнопки
     if update.effective_user.id == ADMIN_ID:
         keyboard = [["📋 Оставить заявку", "👀 Посмотреть заявки"]]
     else:
@@ -55,57 +54,57 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # ----------------------
+# --- Скачать базу ---
+# ----------------------
+async def get_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    with open("leads.db", "rb") as f:
+        await update.message.reply_document(f)
+
+# ----------------------
 # --- Обработка сообщений ---
 # ----------------------
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     print("ПОЛУЧЕНО СООБЩЕНИЕ:", text, "ШАГ:", context.user_data.get("step"))
 
-    # Начало заявки
     if text == "📋 Оставить заявку":
         context.user_data["step"] = "name"
         await update.message.reply_text("Введите имя:")
         return
 
-    # Просмотр заявок (только для админа)
     if text == "👀 Посмотреть заявки" and update.effective_user.id == ADMIN_ID:
         await leads(update, context)
         return
 
-    # Шаг 1 — имя
     if context.user_data.get("step") == "name":
         context.user_data["name"] = text
         context.user_data["step"] = "phone"
         await update.message.reply_text("Введите телефон:")
         return
 
-    # Шаг 2 — телефон
     if context.user_data.get("step") == "phone":
         context.user_data["phone"] = text
         context.user_data["step"] = "task"
         await update.message.reply_text("Опишите задачу:")
         return
 
-    # Шаг 3 — задача
     if context.user_data.get("step") == "task":
         name = context.user_data.get("name")
         phone = context.user_data.get("phone")
         task = text
 
-        # Сохранение в базу
         save_lead(name, phone, task)
-
-        # Уведомление админа
         await notify_admin(context, name, phone, task)
 
         await update.message.reply_text("✅ Ваша заявка сохранена!")
-
-        # Очистка данных
         context.user_data.clear()
         return
 
 # ----------------------
-# --- Команда просмотра заявок (только для админа) ---
+# --- Просмотр заявок ---
 # ----------------------
 async def leads(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -129,7 +128,7 @@ async def leads(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text)
 
 # ----------------------
-# --- Запуск бота ---
+# --- Запуск ---
 # ----------------------
 def main():
     init_db()
@@ -137,10 +136,13 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("leads", leads))
+    app.add_handler(CommandHandler("db", get_db))  # 🔥 ВОТ ЭТА СТРОКА НОВАЯ
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("Бот запущен...")
     app.run_polling()
 
+if __name__ == "__main__":
+    main()
 if __name__ == "__main__":
     main()
