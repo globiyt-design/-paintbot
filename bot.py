@@ -62,7 +62,15 @@ async def get_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     with open("leads.db", "rb") as f:
         await update.message.reply_document(f)
+import os
 
+async def get_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not os.path.exists("leads.db"):
+        await update.message.reply_text("❌ База не найдена")
+        return
+
+    with open("leads.db", "rb") as f:
+        await update.message.reply_document(f)
 # ----------------------
 # --- Обработка сообщений ---
 # ----------------------
