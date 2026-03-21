@@ -56,15 +56,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ----------------------
 # --- Скачать базу ---
 # ----------------------
-async def get_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-
-    with open("leads.db", "rb") as f:
-        await update.message.reply_document(f)
 import os
 
 async def get_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("❌ Ты не админ")
+        return
+
     if not os.path.exists("leads.db"):
         await update.message.reply_text("❌ База не найдена")
         return
