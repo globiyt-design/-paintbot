@@ -132,15 +132,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     
   # 📞 Телефон
-if context.user_data.get("step") == "phone":
+    if context.user_data.get("step") == "phone":
 
     clean_phone = text.replace(" ", "")
 
-    if not clean_phone.isdigit():
+        if not clean_phone.isdigit():
         await update.message.reply_text("❌ Введите только цифры (можно с пробелами)")
         return
 
-    if len(clean_phone) < 10 or len(clean_phone) > 15:
+        if len(clean_phone) < 10 or len(clean_phone) > 15:
         await update.message.reply_text("❌ Введите корректный номер (10–15 цифр)")
         return
 
