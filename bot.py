@@ -130,8 +130,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Введите телефон:", reply_markup=reply_markup)
         return
 
-    # 📞 Телефон
-  if context.user_data.get("step") == "phone":
+    
+  # 📞 Телефон
+if context.user_data.get("step") == "phone":
 
     clean_phone = text.replace(" ", "")
 
