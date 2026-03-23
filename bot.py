@@ -131,18 +131,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 📞 Телефон
-    if context.user_data.get("step") == "phone":
-        context.user_data["phone"] = text
-        context.user_data["step"] = "task"
+  if context.user_data.get("step") == "phone":
 
-        keyboard = [['❌ Отменить заявку']]
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    clean_phone = text.replace(" ", "")
 
-        await update.message.reply_text("Опишите задачу:", reply_markup=reply_markup)
+    if not clean_phone.isdigit():
+        await update.message.reply_text("❌ Введите только цифры (можно с пробелами)")
         return
 
+    if len(clean_phone) < 10 or len(clean_phone) > 15:
+        await update.message.reply_text("❌ Введите корректный номер (10–15 цифр)")
+        return
+
+    context.user_data["phone"] = clean_phone
+    context.user_data["step"] = "task"
+
+    keyboard = [['❌ Отменить заявку']]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+    await update.message.reply_text("Опишите задачу:", reply_markup=reply_markup)
+    return
+      
     # 📝 Задача
     if context.user_data.get("step") == "task":
+        if len(text)>500:
+            await update.message.reply_text("❌ Слишком длинное описание (макс 500 символов)")
+            return
         name = context.user_data.get("name")
         phone = context.user_data.get("phone")
         task = text
