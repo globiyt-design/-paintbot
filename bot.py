@@ -106,8 +106,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 👤 Имя
    if context.user_data.get("step") == "name":
-
-    if len(text) < 2 or len(text) > 50:
+       
+       if len(text) < 2 or len(text) > 50:
         await update.message.reply_text("❌ Имя должно быть от 2 до 50 символов")
         return
 
