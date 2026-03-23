@@ -26,8 +26,6 @@ def save_lead(name, phone, task):
     conn = sqlite3.connect("leads.db")
     cursor = conn.cursor()
 
-    print("📥 Пытаемся сохранить:", name, phone, task)
-
     cursor.execute(
         "INSERT INTO leads (name, phone, task) VALUES (?, ?, ?)",
         (name, phone, task)
@@ -35,8 +33,6 @@ def save_lead(name, phone, task):
 
     conn.commit()
     conn.close()
-
-    print("✅ Сохранено в базе")
 
 
 async def notify_admin(context: ContextTypes.DEFAULT_TYPE, name, phone, task):
@@ -46,9 +42,6 @@ async def notify_admin(context: ContextTypes.DEFAULT_TYPE, name, phone, task):
     )
 
 
-# ----------------------
-# --- Команды ---
-# ----------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_ID:
         keyboard = [["📋 Оставить заявку", "👀 Посмотреть заявки"]]
@@ -63,9 +56,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ----------------------
-# --- Скачать базу ---
-# ----------------------
 async def get_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("❌ Ты не админ")
@@ -79,9 +69,6 @@ async def get_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_document(f)
 
 
-# ----------------------
-# --- Обработка сообщений ---
-# ----------------------
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
@@ -101,8 +88,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup
         )
         return
-
-    print("ПОЛУЧЕНО СООБЩЕНИЕ:", text, "ШАГ:", context.user_data.get("step"))
 
     # 📋 Старт заявки
     if text == "📋 Оставить заявку":
@@ -130,34 +115,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Введите телефон:", reply_markup=reply_markup)
         return
 
-    
-  # 📞 Телефон
+    # 📞 Телефон
     if context.user_data.get("step") == "phone":
 
-    clean_phone = text.replace(" ", "")
+        clean_phone = text.replace(" ", "")
 
         if not clean_phone.isdigit():
-        await update.message.reply_text("❌ Введите только цифры (можно с пробелами)")
-        return
+            await update.message.reply_text("❌ Введите только цифры (можно с пробелами)")
+            return
 
         if len(clean_phone) < 10 or len(clean_phone) > 15:
-        await update.message.reply_text("❌ Введите корректный номер (10–15 цифр)")
+            await update.message.reply_text("❌ Введите корректный номер (10–15 цифр)")
+            return
+
+        context.user_data["phone"] = clean_phone
+        context.user_data["step"] = "task"
+
+        keyboard = [['❌ Отменить заявку']]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+        await update.message.reply_text("Опишите задачу:", reply_markup=reply_markup)
         return
 
-    context.user_data["phone"] = clean_phone
-    context.user_data["step"] = "task"
-
-    keyboard = [['❌ Отменить заявку']]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-    await update.message.reply_text("Опишите задачу:", reply_markup=reply_markup)
-    return
-      
     # 📝 Задача
     if context.user_data.get("step") == "task":
-        if len(text)>500:
+
+        if len(text) > 500:
             await update.message.reply_text("❌ Слишком длинное описание (макс 500 символов)")
             return
+
         name = context.user_data.get("name")
         phone = context.user_data.get("phone")
         task = text
@@ -181,9 +167,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
-# ----------------------
-# --- Просмотр заявок ---
-# ----------------------
 async def leads(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("❌ У вас нет доступа.")
@@ -206,9 +189,6 @@ async def leads(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text)
 
 
-# ----------------------
-# --- Запуск ---
-# ----------------------
 def main():
     init_db()
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
