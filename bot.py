@@ -48,9 +48,9 @@ async def notify_admin(context: ContextTypes.DEFAULT_TYPE, name, phone, task):
 # ----------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_ID:
-        keyboard = [["📋 Оставить заявку","❌ Отменить заявку","👀 Посмотреть заявки"]]
+        keyboard = [["📋 Оставить заявку","👀 Посмотреть заявки"]]
     else:
-        keyboard = [["📋 Оставить заявку",'❌ Отменить заявку']]
+        keyboard = [["📋 Оставить заявку"]]
 
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(
@@ -82,14 +82,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if text=='❌ Отменить заявку':
         context.user_data.clear()
-        await update.message.reply_text('❌ Заявка отменена')
+        
+        if update.effective_user.id==ADMIN_ID:
+            keyboard=[["📋 Оставить заявку", "👀 Посмотреть заявки"]]
+        else:
+            keyboard=[["📋 Оставить заявку"]]
+
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        
+        await update.message.reply_text('❌ Заявка отменена',reply_markup=reply_markup)
         return
         
     print("ПОЛУЧЕНО СООБЩЕНИЕ:", text, "ШАГ:", context.user_data.get("step"))
 
     if text == "📋 Оставить заявку":
         context.user_data["step"] = "name"
-        await update.message.reply_text("Введите имя:")
+
+        keyboard=[['❌ Отменить заявку']]
+        reply_markup=ReplyKeyboardMarkup(keyboard,resize_keyboard=True)
+        
+        await update.message.reply_text("Введите имя:",reply_markup=reply_markup)
         return
 
     if text == "👀 Посмотреть заявки" and update.effective_user.id == ADMIN_ID:
@@ -99,13 +111,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("step") == "name":
         context.user_data["name"] = text
         context.user_data["step"] = "phone"
-        await update.message.reply_text("Введите телефон:")
+        await update.message.reply_text("Введите телефон:",reply_markup=reply_markup)
         return
 
     if context.user_data.get("step") == "phone":
         context.user_data["phone"] = text
         context.user_data["step"] = "task"
-        await update.message.reply_text("Опишите задачу:")
+        await update.message.reply_text("Опишите задачу:",reply_markup=reply_markup)
         return
 
     if context.user_data.get("step") == "task":
@@ -116,7 +128,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_lead(name, phone, task)
         await notify_admin(context, name, phone, task)
 
-        await update.message.reply_text("✅ Ваша заявка сохранена!")
+        if update.effective_user.id==ADMIN_ID:
+            keyboard=[["📋 Оставить заявку", "👀 Посмотреть заявки"]]
+        else:
+            keyboard=[["📋 Оставить заявку"]]
+
+        reply_markup=ReplyKeyboardMarkup(keyboard,resize_keyboard=True)
+        
+        await update.message.reply_text("✅ Ваша заявка сохранена!",reply_markup=reply_markup)
         context.user_data.clear()
         return
 
