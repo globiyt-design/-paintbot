@@ -4,7 +4,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 import os
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-ADMIN_ID = int(os.environ.get("ADMIN_ID"))  
+ADMIN_ID = int(os.environ.get("ADMIN_ID"))
 
 
 def init_db():
@@ -20,6 +20,7 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+
 
 def save_lead(name, phone, task):
     conn = sqlite3.connect("leads.db")
@@ -37,32 +38,34 @@ def save_lead(name, phone, task):
 
     print("✅ Сохранено в базе")
 
+
 async def notify_admin(context: ContextTypes.DEFAULT_TYPE, name, phone, task):
     await context.bot.send_message(
         chat_id=ADMIN_ID,
         text=f"🔥 Новая заявка!\nИмя: {name}\nТелефон: {phone}\nЗадача: {task}"
     )
 
+
 # ----------------------
 # --- Команды ---
 # ----------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_ID:
-        keyboard = [["📋 Оставить заявку","👀 Посмотреть заявки"]]
+        keyboard = [["📋 Оставить заявку", "👀 Посмотреть заявки"]]
     else:
         keyboard = [["📋 Оставить заявку"]]
 
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
     await update.message.reply_text(
         "Привет! Нажми кнопку, чтобы оставить заявку.",
         reply_markup=reply_markup
     )
 
+
 # ----------------------
 # --- Скачать базу ---
 # ----------------------
-import os
-
 async def get_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("❌ Ты не админ")
@@ -74,52 +77,71 @@ async def get_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     with open("leads.db", "rb") as f:
         await update.message.reply_document(f)
+
+
 # ----------------------
 # --- Обработка сообщений ---
 # ----------------------
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    
-    if text=='❌ Отменить заявку':
-        context.user_data.clear()
-        
-        if update.effective_user.id==ADMIN_ID:
-            keyboard=[["📋 Оставить заявку", "👀 Посмотреть заявки"]]
-        else:
-            keyboard=[["📋 Оставить заявку"]]
 
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        
-        await update.message.reply_text('❌ Заявка отменена',reply_markup=reply_markup)
+    # ❌ Отмена
+    if text == '❌ Отменить заявку':
+        context.user_data.clear()
+
+        if update.effective_user.id == ADMIN_ID:
+            keyboard = [["📋 Оставить заявку", "👀 Посмотреть заявки"]]
+        else:
+            keyboard = [["📋 Оставить заявку"]]
+
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+        await update.message.reply_text(
+            '❌ Заявка отменена',
+            reply_markup=reply_markup
+        )
         return
-        
+
     print("ПОЛУЧЕНО СООБЩЕНИЕ:", text, "ШАГ:", context.user_data.get("step"))
 
+    # 📋 Старт заявки
     if text == "📋 Оставить заявку":
         context.user_data["step"] = "name"
 
-        keyboard=[['❌ Отменить заявку']]
-        reply_markup=ReplyKeyboardMarkup(keyboard,resize_keyboard=True)
-        
-        await update.message.reply_text("Введите имя:",reply_markup=reply_markup)
+        keyboard = [['❌ Отменить заявку']]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+        await update.message.reply_text("Введите имя:", reply_markup=reply_markup)
         return
 
+    # 👀 Заявки (админ)
     if text == "👀 Посмотреть заявки" and update.effective_user.id == ADMIN_ID:
         await leads(update, context)
         return
 
+    # 👤 Имя
     if context.user_data.get("step") == "name":
         context.user_data["name"] = text
         context.user_data["step"] = "phone"
-        await update.message.reply_text("Введите телефон:",reply_markup=reply_markup)
+
+        keyboard = [['❌ Отменить заявку']]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+        await update.message.reply_text("Введите телефон:", reply_markup=reply_markup)
         return
 
+    # 📞 Телефон
     if context.user_data.get("step") == "phone":
         context.user_data["phone"] = text
         context.user_data["step"] = "task"
-        await update.message.reply_text("Опишите задачу:",reply_markup=reply_markup)
+
+        keyboard = [['❌ Отменить заявку']]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+        await update.message.reply_text("Опишите задачу:", reply_markup=reply_markup)
         return
 
+    # 📝 Задача
     if context.user_data.get("step") == "task":
         name = context.user_data.get("name")
         phone = context.user_data.get("phone")
@@ -128,16 +150,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_lead(name, phone, task)
         await notify_admin(context, name, phone, task)
 
-        if update.effective_user.id==ADMIN_ID:
-            keyboard=[["📋 Оставить заявку", "👀 Посмотреть заявки"]]
+        if update.effective_user.id == ADMIN_ID:
+            keyboard = [["📋 Оставить заявку", "👀 Посмотреть заявки"]]
         else:
-            keyboard=[["📋 Оставить заявку"]]
+            keyboard = [["📋 Оставить заявку"]]
 
-        reply_markup=ReplyKeyboardMarkup(keyboard,resize_keyboard=True)
-        
-        await update.message.reply_text("✅ Ваша заявка сохранена!",reply_markup=reply_markup)
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+        await update.message.reply_text(
+            "✅ Ваша заявка сохранена!",
+            reply_markup=reply_markup
+        )
+
         context.user_data.clear()
         return
+
 
 # ----------------------
 # --- Просмотр заявок ---
@@ -163,6 +190,7 @@ async def leads(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+
 # ----------------------
 # --- Запуск ---
 # ----------------------
@@ -177,6 +205,7 @@ def main():
 
     print("Бот запущен...")
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()
