@@ -105,14 +105,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 👤 Имя
-    if context.user_data.get("step") == "name":
-        context.user_data["name"] = text
-        context.user_data["step"] = "phone"
-     
-    if len(text) < 2 or len(text) > 50:
-    await update.message.reply_text("❌ Имя должно быть от 2 до 50 символов")
-    return
+   if context.user_data.get("step") == "name":
 
+    if len(text) < 2 or len(text) > 50:
+        await update.message.reply_text("❌ Имя должно быть от 2 до 50 символов")
+        return
+
+    context.user_data["name"] = text
+    context.user_data["step"] = "phone"
+
+    keyboard = [['❌ Отменить заявку']]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+    await update.message.reply_text("Введите телефон:", reply_markup=reply_markup)
+    return
+    
         keyboard = [['❌ Отменить заявку']]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
