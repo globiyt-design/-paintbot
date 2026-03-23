@@ -48,9 +48,9 @@ async def notify_admin(context: ContextTypes.DEFAULT_TYPE, name, phone, task):
 # ----------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_ID:
-        keyboard = [["📋 Оставить заявку", "👀 Посмотреть заявки"]]
+        keyboard = [["📋 Оставить заявку","❌ Отменить заявку"."👀 Посмотреть заявки"]]
     else:
-        keyboard = [["📋 Оставить заявку"]]
+        keyboard = [["📋 Оставить заявку",'❌ Отменить заявку']]
 
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(
@@ -79,6 +79,10 @@ async def get_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ----------------------
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
+    if text=='❌ Отменить заявку':
+        content_user.data.clear()
+        await update.message.reply_text('❌ Заявка отменена')
+        return
     print("ПОЛУЧЕНО СООБЩЕНИЕ:", text, "ШАГ:", context.user_data.get("step"))
 
     if text == "📋 Оставить заявку":
