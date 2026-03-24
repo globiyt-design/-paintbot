@@ -25,14 +25,18 @@ def init_db():
 def save_lead(name, phone, task):
     conn = sqlite3.connect("leads.db")
     cursor = conn.cursor()
-
     cursor.execute(
         "INSERT INTO leads (name, phone, task) VALUES (?, ?, ?)",
         (name, phone, task)
     )
-
     conn.commit()
     conn.close()
+
+
+# ➕ ДОБАВИЛИ ЭТУ ФУНКЦИЮ
+def save_to_file(name, phone, task):
+    with open("leads.txt", "a", encoding="utf-8") as f:
+        f.write(f"Имя: {name} | Телефон: {phone} | Задача: {task}\n")
 
 
 async def notify_admin(context: ContextTypes.DEFAULT_TYPE, name, phone, task):
@@ -72,7 +76,6 @@ async def get_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    # ❌ Отмена
     if text == '❌ Отменить заявку':
         context.user_data.clear()
 
@@ -83,13 +86,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-        await update.message.reply_text(
-            '❌ Заявка отменена',
-            reply_markup=reply_markup
-        )
+        await update.message.reply_text('❌ Заявка отменена', reply_markup=reply_markup)
         return
 
-    # 📋 Старт заявки
     if text == "📋 Оставить заявку":
         context.user_data["step"] = "name"
 
@@ -99,12 +98,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Введите имя:", reply_markup=reply_markup)
         return
 
-    # 👀 Заявки (админ)
     if text == "👀 Посмотреть заявки" and update.effective_user.id == ADMIN_ID:
         await leads(update, context)
         return
 
-    # 👤 Имя
     if context.user_data.get("step") == "name":
 
         if len(text) < 2 or len(text) > 50:
@@ -114,19 +111,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["name"] = text
         context.user_data["step"] = "phone"
 
-        keyboard = [['❌ Отменить заявку']]
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-        await update.message.reply_text("Введите телефон:", reply_markup=reply_markup)
+        await update.message.reply_text("Введите телефон:")
         return
 
-    # 📞 Телефон
     if context.user_data.get("step") == "phone":
 
         clean_phone = text.replace(" ", "")
 
         if not clean_phone.isdigit():
-            await update.message.reply_text("❌ Введите только цифры (можно с пробелами)")
+            await update.message.reply_text("❌ Введите только цифры")
             return
 
         if len(clean_phone) < 10 or len(clean_phone) > 15:
@@ -136,13 +129,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["phone"] = clean_phone
         context.user_data["step"] = "task"
 
-        keyboard = [['❌ Отменить заявку']]
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-        await update.message.reply_text("Опишите задачу:", reply_markup=reply_markup)
+        await update.message.reply_text("Опишите задачу:")
         return
 
-    # 📝 Задача
     if context.user_data.get("step") == "task":
 
         if len(text) > 500:
@@ -154,19 +143,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         task = text
 
         save_lead(name, phone, task)
+        save_to_file(name, phone, task)  # ➕ ВОТ ЭТО ДОБАВИЛИ
         await notify_admin(context, name, phone, task)
 
-        if update.effective_user.id == ADMIN_ID:
-            keyboard = [["📋 Оставить заявку", "👀 Посмотреть заявки"]]
-        else:
-            keyboard = [["📋 Оставить заявку"]]
-
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-        await update.message.reply_text(
-            "✅ Ваша заявка сохранена!",
-            reply_markup=reply_markup
-        )
+        await update.message.reply_text("✅ Ваша заявка сохранена!")
 
         context.user_data.clear()
         return
@@ -205,6 +185,10 @@ def main():
 
     print("Бот запущен...")
     app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":
